@@ -109,13 +109,23 @@ def keyboardFunc( key, x, y ):
     if key == '\r' or key == '\x1b':
         exit()
     elif key == 'r':
-        glTranslate(-center[0], -center[1], -center[2])
+        glTranslatef(-center[0], -center[1], -center[2])
         glRotatef(30.0, 1, 0, 0)
-        glTranslate(center[0], center[1], center[2])
+        glTranslatef(center[0], center[1], center[2])
         glutPostRedisplay()
     elif key == 't':
-        glTranslate(1,0,0)
+        glTranslatef(1,0,0)
         center[0] += 1
+        center[1] += 0
+        center[2] += 0
+        glutPostRedisplay()
+    elif key == 's':
+        glTranslatef(-center[0], -center[1], -center[2])
+        glScalef(1.5,1.5,1.5)
+        center[0] /= 1.5
+        center[1] /= 1.5
+        center[2] /= 1.5
+        glTranslatef(center[0], center[1], center[2])
         glutPostRedisplay()
 
 def drawScene():

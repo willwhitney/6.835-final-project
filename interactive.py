@@ -15,6 +15,8 @@ radiusDecreaseThreshold = 5
 
 palmVelocityThreshold = 700
 
+center = [0,0,0]
+
 class GestureController(Leap.Listener):
     def on_init(self, controller):
         self.state = 'open'
@@ -107,9 +109,14 @@ def keyboardFunc( key, x, y ):
     if key == '\r' or key == '\x1b':
         exit()
     elif key == 'r':
+        glTranslate(-center[0], -center[1], -center[2])
         glRotatef(30.0, 1, 0, 0)
+        glTranslate(center[0], center[1], center[2])
         glutPostRedisplay()
-
+    elif key == 't':
+        glTranslate(1,0,0)
+        center[0] += 1
+        glutPostRedisplay()
 
 def drawScene():
     glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT)

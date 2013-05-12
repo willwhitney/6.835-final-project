@@ -87,7 +87,11 @@ class GestureController(Leap.Listener):
                             self.state = 'open'
                             return
 
-                    print frame.hands[0].palm_position
+                    hand = frame.hands[0]
+                    print hand.palm_position
+                    print (hand.direction.pitch * Leap.RAD_TO_DEG,
+                            hand.palm_normal.roll * Leap.RAD_TO_DEG,
+                            hand.direction.yaw * Leap.RAD_TO_DEG)
 
         else:
             if not self.recent_hands(controller, 10):

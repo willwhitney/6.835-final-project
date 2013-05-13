@@ -166,15 +166,20 @@ def keyboardFunc( key, x, y ):
         exit()
     elif key == 'r':
         angle[0] += 20
-        # glTranslate(-center[0], -center[1], -center[2])
-        # glRotatef(30.0, 1, 0, 0)
-        # glTranslate(center[0], center[1], center[2])
         glutPostRedisplay()
     elif key == 't':
         center[0] += 1
-        # glTranslate(1,0,0)
-        # center[0] += 1
-        # glutPostRedisplay()
+        center[1] += 0
+        center[2] += 0
+        glutPostRedisplay()
+    elif key == 's':
+        glTranslatef(-center[0], -center[1], -center[2])
+        glScalef(1.5,1.5,1.5)
+        center[0] /= 1.5
+        center[1] /= 1.5
+        center[2] /= 1.5
+        glTranslatef(center[0], center[1], center[2])
+        glutPostRedisplay()
 
 def drawScene():
     glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT)

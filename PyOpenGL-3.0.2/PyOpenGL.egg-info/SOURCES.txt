@@ -1,6 +1,7 @@
 MANIFEST.in
 license.txt
 metadata.py
+setup.cfg
 setup.py
 OpenGL/__init__.py
 OpenGL/_bytes.py

@@ -10,10 +10,10 @@ numPastFrames = lastHistoryFrame - firstHistoryFrame
 averageWindow = 5
 
 fingerDecreaseThreshold = 2
-fingerIncreaseThreshold = 0
+fingerIncreaseThreshold = 1
 radiusDecreaseThreshold = 5
 
-palmVelocityThreshold = 700
+palmVelocityThreshold = 500
 
 queue = Queue.Queue()
 
@@ -24,7 +24,7 @@ rotation = [0, 0, 0]
 
 class GestureController(Leap.Listener):
     def on_init(self, controller):
-        self.state = 'open'
+        self.state = 'closed'
         self.translated = False
         print "Initialized"
         glutPostRedisplay()
@@ -105,8 +105,20 @@ class GestureController(Leap.Listener):
                             self.state = 'closed'
                             return
 
+                        lastHand = self.average_hands(controller, averageWindow + 1, 2 * averageWindow)
+                        translation = (
+                                hand['x'] - lastHand['x'], 
+                                hand['y'] - lastHand['y'], 
+                                hand['z'] - lastHand['z']
+                        )
+                        rotation = (
+                                hand['pitch'] - lastHand['pitch'], 
+                                hand['roll'] - lastHand['roll'], 
+                                hand['yaw'] - lastHand['yaw']
+                        )
+                        queue.put(translation + rotation)
 
-                    # print frame.hands[0]
+                        
 
                 else:
                     hand = self.average_hands(controller, 0, averageWindow)
@@ -119,19 +131,7 @@ class GestureController(Leap.Listener):
                             self.state = 'open'
                             return
 
-                        lastHand = self.average_hands(controller, averageWindow + 1, 2 * averageWindow)
-                        translation = (
-                                hand['x'] - lastHand['x'], 
-                                hand['y'] - lastHand['y'], 
-                                hand['z'] - lastHand['z']
-                        )
-                        rotation = (
-                                hand['pitch'] - lastHand['pitch'], 
-                                hand['roll'] - lastHand['roll'], 
-                                hand['yaw'] - lastHand['yaw']
-                        )
-                        # print rotation
-                        queue.put(translation + rotation)
+                        
 
 
         else:
@@ -144,7 +144,7 @@ def updatePosition():
     while not queue.empty():
         movement = list(queue.get_nowait())
         translation = [movement[i] / 200 for i in range(3)]
-        rotation = [movement[i] / 2 for i in range(3, 6)]
+        rotation = [movement[i] / 4 for i in range(3, 6)]
 
         center = [center[i] + translation[i] for i in range(3)]
         angle = [angle[i] + rotation[i] for i in range(3)]

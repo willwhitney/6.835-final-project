@@ -10,7 +10,7 @@ numPastFrames = lastHistoryFrame - firstHistoryFrame
 averageWindow = 5
 
 fingerDecreaseThreshold = 2
-fingerIncreaseThreshold = 1
+fingerIncreaseThreshold = 1.5
 radiusDecreaseThreshold = 5
 
 palmVelocityThreshold = 500
@@ -24,12 +24,12 @@ rotation = [0, 0, 0]
 
 class GestureController(Leap.Listener):
     def on_init(self, controller):
-        self.state = 'closed'
+        self.activeState = 'open'
+        self.inactiveState = 'closed'
+        self.state = self.inactiveState
         self.translated = False
+        self.controlHand = None
         print "Initialized"
-        glutPostRedisplay()
-        # glTranslate(1.2, 3.5, 8.0)
-        # glutPostRedisplay()
 
     def setQueue(self, queue):
         self.queue = queue
@@ -41,7 +41,7 @@ class GestureController(Leap.Listener):
         # Note: not dispatched when running in a debugger.
         print "Disconnected"
 
-    def average_hands(self, controller, start, stop):
+    def average_hands(self, controller, start, stop, id=None):
         hand = {
             'sphere_radius': 0,
             'numFingers': 0,
@@ -56,7 +56,13 @@ class GestureController(Leap.Listener):
             frame = controller.frame(i)
             if len(frame.hands) == 0:
                 return None
-            thisHand = frame.hands[0]
+
+            if id != None:
+                for h in frame.hands:
+                    if h.id == id:
+                        thisHand = h
+            else:
+                thisHand = frame.hands[0]
             hand['sphere_radius'] += thisHand.sphere_radius
             hand['numFingers'] += len(thisHand.fingers)
             hand['x'] += thisHand.palm_position.x 
@@ -77,19 +83,36 @@ class GestureController(Leap.Listener):
         }
         return hand
 
-    def recent_hands(self, controller, count):
+    def one_recent_hand(self, controller, count):
         for i in xrange(0, count, 1):
             frame = controller.frame(i)
             if len(frame.hands) != 0:
                 return True
         return False
 
+    def all_recent_hands(self, controller, count):
+        handFrames = 0
+        for i in xrange(0, count, 1):
+            frame = controller.frame(i)
+            if len(frame.hands) != 0:
+                handFrames += 1
+        return handFrames > .95 * count
+
+    def set_state(self, state, controller):
+        if state == self.state:
+            return
+        if state == self.activeState:
+            self.controlHand = controller.frame().hands[0].id
+        else:
+            self.controlHand = None
+        self.state = state
+
     def on_frame(self, controller):
         frame = controller.frame()
 
         # print "Frame id: %d, timestamp: %d, hands: %d, fingers: %d, tools: %d, gestures: %d" % (
         #       frame.id, frame.timestamp, len(frame.hands), len(frame.fingers), len(frame.tools), len(frame.gestures()))
-
+        # print [frame.hands[i].id for i in range(len(frame.hands))]
         if len(frame.hands) > 0:
             hand = frame.hands[0]
             velocity = (hand.palm_velocity.x ** 2 + hand.palm_velocity.y ** 2 + hand.palm_velocity.z ** 2) **(1./2)
@@ -102,23 +125,8 @@ class GestureController(Leap.Listener):
                         if oldHand['numFingers'] - hand['numFingers'] > fingerDecreaseThreshold \
                                 and oldHand['sphere_radius'] - hand['sphere_radius'] > radiusDecreaseThreshold:
                             print "Closing Gesture Detected! \n\n"
-                            self.state = 'closed'
+                            self.set_state('closed', controller)
                             return
-
-                        lastHand = self.average_hands(controller, averageWindow + 1, 2 * averageWindow)
-                        translation = (
-                                hand['x'] - lastHand['x'], 
-                                hand['y'] - lastHand['y'], 
-                                hand['z'] - lastHand['z']
-                        )
-                        rotation = (
-                                hand['pitch'] - lastHand['pitch'], 
-                                hand['roll'] - lastHand['roll'], 
-                                hand['yaw'] - lastHand['yaw']
-                        )
-                        queue.put(translation + rotation)
-
-                        
 
                 else:
                     hand = self.average_hands(controller, 0, averageWindow)
@@ -128,17 +136,38 @@ class GestureController(Leap.Listener):
                         if oldHand['numFingers'] - hand['numFingers'] < -1 * fingerIncreaseThreshold \
                                 and oldHand['sphere_radius'] - hand['sphere_radius'] < -1 * radiusDecreaseThreshold:
                             print "Opening Gesture Detected! \n\n"
-                            self.state = 'open'
+                            self.set_state('open', controller)
                             return
 
+                if self.state == self.activeState:
+                    for hand in controller.frame().hands:
+                        if hand.id == self.controlHand:
+                            controlHand = self.average_hands(controller, 0, averageWindow, hand.id)
+                            self.lastControlHand = self.average_hands(controller, averageWindow + 1, 2 * averageWindow, hand.id)
+                        else:
+                            pointerHand = self.average_hands(controller, 0, averageWindow, hand.id)
+
+                    if self.lastControlHand != None:
+                        translation = (
+                                controlHand['x'] - self.lastControlHand['x'], 
+                                controlHand['y'] - self.lastControlHand['y'], 
+                                controlHand['z'] - self.lastControlHand['z']
+                        )
+                        rotation = (
+                                controlHand['pitch'] - self.lastControlHand['pitch'], 
+                                controlHand['roll'] - self.lastControlHand['roll'], 
+                                controlHand['yaw'] - self.lastControlHand['yaw']
+                        )
+                        queue.put(translation + rotation)
                         
 
 
         else:
-            if not self.recent_hands(controller, 10):
-                self.state = 'open'
+            if not self.one_recent_hand(controller, 10):
+                self.set_state(self.inactiveState, controller)
 
 def updatePosition():
+    updated = not queue.empty()
     global center
     global angle
     while not queue.empty():
@@ -155,8 +184,8 @@ def updatePosition():
     # glRotatef(angle[1], 0, 1, 0)
     # glRotatef(angle[2], 0, 0, 1)
     # glTranslate(*center)
-
-    glutPostRedisplay()
+    if updated:
+        glutPostRedisplay()
 
  
 # This function is called whenever a "Normal" key press is received.
@@ -188,7 +217,7 @@ def drawScene():
     # reverseCenter = [-1 * center[i] for i in range(3)]
     glLoadIdentity();
 
-    print center, angle
+    # print center, angle
     glTranslate(0, 0, -10)
     # glTranslate(*reverseCenter)
     glTranslate(*center)
@@ -202,7 +231,7 @@ def drawScene():
 
     color = [0.5, 0.5, 0.9, 1.0]
     glMaterialfv(GL_FRONT,GL_DIFFUSE,color)
-    glutWireTeapot(1)
+    glutWireSphere(1, 30, 30)
 
     glPopMatrix()
 

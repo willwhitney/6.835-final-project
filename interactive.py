@@ -2,7 +2,7 @@ from OpenGL.GLUT import *
 from OpenGL.GLU import *
 from OpenGL.GL import *
 import Leap, sys, Queue
-import numpy
+import numpy as np
 
 firstHistoryFrame = 30
 lastHistoryFrame = 40
@@ -27,6 +27,7 @@ translation = [0, 0, 0]
 rotation = [0, 0, 0]
 
 postPointingAngle = None
+postPointingRotationMatrix = None
 
 class GestureController(Leap.Listener):
     def on_init(self, controller):
@@ -249,14 +250,21 @@ def updatePosition():
     global pointerPosition
     global pointerData
     global postPointingAngle
+    global postPointingRotationMatrix
     # global angle
     while not pointerQueue.empty():
         pointerData = pointerQueue.get_nowait()
         if pointerData[0] != None and pointerData[1]:
             pointerPosition = pointerData[0]
             postPointingAngle = None
+            postPointingRotationMatrix = None
         if not pointerData[1] and postPointingAngle == None:
             postPointingAngle = angle
+            glLoadIdentity()
+            glRotatef(angle[0], 1, 0, 0)
+            glRotatef(angle[1], 0, 0, 1)
+            glRotatef(-1 * angle[2], 0, 1, 0)
+            postPointingRotationMatrix = np.matrix(glGetFloatv(GL_MODELVIEW_MATRIX))
         # translation = [movement[i] / 200 for i in range(3)]
         # rotation = [movement[i] / 4 for i in range(3, 6)]
 
@@ -363,7 +371,7 @@ def drawScene():
     glRotatef(angle[1], 0, 0, 1)
     glRotatef(-1 * angle[2], 0, 1, 0)
      
-    print numpy.matrix(glGetFloatv(GL_MODELVIEW_MATRIX))
+    # print numpy.matrix(glGetFloatv(GL_MODELVIEW_MATRIX))
     
     # Position the camera at [0,0,20], looking at [0,0,0],
     # with [0,1,0] as the up direction.    
@@ -407,7 +415,7 @@ def drawScene():
         glPopMatrix()
     """
     # else:
-    print currentlyPointing, postPointingAngle
+    print postPointingRotationMatrix
     if pointerPosition != None and currentlyPointing:
         print "POINTING METHOD 1"
         glPushMatrix()
@@ -447,22 +455,33 @@ def drawScene():
 
         glPopMatrix()
         
-    elif pointerPosition != None and postPointingAngle != None and not currentlyPointing:
+    elif pointerPosition != None and postPointingRotationMatrix != None and not currentlyPointing:
         print "POINTING METHOD 2"
         glPushMatrix()
         glLoadIdentity()
+
         # Position the camera at [0,0,20], looking at [0,0,0],
         # with [0,1,0] as the up direction.
-        gluLookAt(0,0,10,
-                  0,0,0,
-                  0,1,0)
+        
+        glTranslate(*center)  
+
+        glRotatef(angle[0], 1, 0, 0)
+        glRotatef(angle[1], 0, 0, 1)
+        glRotatef(-1 * angle[2], 0, 1, 0)
+        inverse = postPointingRotationMatrix.I
+        inverse[3, 0:2] = 0
+        m = inverse * np.matrix(glGetFloatv(GL_MODELVIEW_MATRIX))
+        glLoadMatrixf(m)
+
+        print m
 
         # glTranslate(*reverseCenter)
 
         # absolutePointerPosition = [center[i] + pointerPosition[i] for i in range(len(center))]
 
+        glTranslate(*pointerPosition)
 
-        glTranslate(*center)        
+              
         
         # color = [0.0, 0.0, 1.0, 1.0]
         # glMaterialfv(GL_FRONT,GL_DIFFUSE,color)
@@ -475,10 +494,10 @@ def drawScene():
         # glRotatef(-1 * postPointingAngle[0], 1, 0, 0)
         # glRotatef(-1 * postPointingAngle[1], 0, 0, 1)
         # glRotatef(postPointingAngle[2], 0, 1, 0)
-        # 
-        glRotatef(angle[0], 1, 0, 0)
-        glRotatef(angle[1], 0, 0, 1)
-        glRotatef(-1 * angle[2], 0, 1, 0)
+        # # 
+        # glRotatef(angle[0], 1, 0, 0)
+        # glRotatef(angle[1], 0, 0, 1)
+        # glRotatef(-1 * angle[2], 0, 1, 0)
         # print postPointingAngle, angle, '\n\n'
         
 
@@ -490,12 +509,14 @@ def drawScene():
         # glutSolidSphere(0.1, 30, 30)
         
 
-        glTranslate(*pointerPosition)
 
 
         color = [1.0, 0.0, 0.0, 1.0]
         glMaterialfv(GL_FRONT,GL_DIFFUSE,color)
         glutSolidSphere(0.1, 30, 30)
+        gluLookAt(0,0,10,
+                  0,0,0,
+                  0,1,0)
 
         glPopMatrix()
     

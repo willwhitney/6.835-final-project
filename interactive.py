@@ -156,7 +156,6 @@ class GestureController(Leap.Listener):
         intersection = vectorStart + vectorDirection * distance
 
         direction = (intersection - sphereCenter) / ((intersection - sphereCenter).dot(intersection - sphereCenter)) ** (0.5)
-        print direction
         return direction
 
     def on_frame(self, controller):
@@ -257,12 +256,6 @@ def updatePosition():
             postPointingAngle = None
         if not pointerData[1] and postPointingAngle == None:
             postPointingAngle = angle
-        # translation = [movement[i] / 200 for i in range(3)]
-        # rotation = [movement[i] / 4 for i in range(3, 6)]
-
-        # pointerPosition = [pointerPosition[i] + translation[i] for i in range(3)]
-        # angle = [angle[i] + rotation[i] for i in range(3)]
-
     if updated:
         glutPostRedisplay()
 
@@ -293,57 +286,7 @@ def drawScene():
     glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT)
     
     currentlyPointing = pointerData[1]
-    
-    """
-    # --------------------------- EXPERIMENT ---------------------------
-    glPushMatrix()
 
-    # reverseCenter = [-1 * center[i] for i in range(3)]
-    glLoadIdentity();
-    
-    # Position the camera at [0,0,20], looking at [0,0,0],
-    # with [0,1,0] as the up direction.
-    gluLookAt(0,0,20,
-              0,0,0,
-              0,1,0)
-
-    # print center, angle
-    # glTranslate(0, 0, -10)
-    # glTranslate(*reverseCenter)
-    # glTranslate(0, 0, 0)
-    
-    color = [1.0, 0.0, 0.0, 1.0]
-    glMaterialfv(GL_FRONT,GL_DIFFUSE,color)
-    glutWireSphere(0.5, 30, 30)
-    
-    glRotatef(90, 0, 0, 1)
-    
-    color = [0.0, 1.0, 0.0, 1.0]
-    glMaterialfv(GL_FRONT,GL_DIFFUSE,color)
-    glutWireSphere(0.5, 30, 30)
-    
-    glTranslate(1, 0, 0)
-
-    color = [0.0, 0.0, 1.0, 1.0]
-    glMaterialfv(GL_FRONT,GL_DIFFUSE,color)
-    glutWireSphere(0.5, 30, 30)
-
-    
-    # glRotatef(angle[0], 1, 0, 0)
-     #    glRotatef(angle[1], 0, 0, 1)
-     #    glRotatef(-1 * angle[2], 0, 1, 0)   
-
-    
-    # if pointerPosition != None:
-    #         glTranslate(*pointerPosition)
-    # 
-    #         color = [1.0, 0.0, 0.0, 1.0]
-    #         glMaterialfv(GL_FRONT,GL_DIFFUSE,color)
-    #         glutSolidSphere(0.1, 30, 30)
-
-    glPopMatrix()
-    
-    """
     # --------------------------- OBJECT ---------------------------
     glPushMatrix()
 
@@ -363,8 +306,6 @@ def drawScene():
     glRotatef(angle[1], 0, 0, 1)
     glRotatef(-1 * angle[2], 0, 1, 0)
      
-    print numpy.matrix(glGetFloatv(GL_MODELVIEW_MATRIX))
-    
     # Position the camera at [0,0,20], looking at [0,0,0],
     # with [0,1,0] as the up direction.    
 
@@ -372,44 +313,11 @@ def drawScene():
     glMaterialfv(GL_FRONT,GL_DIFFUSE,color)
     glutWireSphere(1, 30, 30)
     
-    # if pointerPosition != None:
-    #         glTranslate(*pointerPosition)
-    # 
-    #         color = [1.0, 0.0, 0.0, 1.0]
-    #         glMaterialfv(GL_FRONT,GL_DIFFUSE,color)
-    #         glutSolidSphere(0.1, 30, 30)
-
     glPopMatrix()
     
     # --------------------------- POINTER ---------------------------
-    """
-    if pointerData[1]:   
 
-        glPushMatrix()
-        glLoadIdentity()
-
-        glTranslate(0, 0, -10)
-        # glTranslate(*reverseCenter)
-
-        absolutePointerPosition = [center[i] + pointerPosition[i] for i in range(len(center))]
-
-        # print pointerPosition
-
-        glTranslate(*absolutePointerPosition)
-        # glRotatef(angle[0], 1, 0, 0)
-        # glRotatef(angle[1], 0, 0, 1)
-        # glRotatef(-1 * angle[2], 0, 1, 0)
-
-        color = [1.0, 0.0, 0.0, 1.0]
-        glMaterialfv(GL_FRONT,GL_DIFFUSE,color)
-        glutSolidSphere(0.1, 30, 30)
-
-        glPopMatrix()
-    """
-    # else:
-    print currentlyPointing, postPointingAngle
     if pointerPosition != None and currentlyPointing:
-        print "POINTING METHOD 1"
         glPushMatrix()
         glLoadIdentity()
         # Position the camera at [0,0,20], looking at [0,0,0],
@@ -418,87 +326,14 @@ def drawScene():
                   0,0,0,
                   0,1,0)
 
-        # glTranslate(*reverseCenter)
-
-        # absolutePointerPosition = [center[i] + pointerPosition[i] for i in range(len(center))]
-
-
         glTranslate(*center)        
-        
-        # color = [0.0, 0.0, 1.0, 1.0]
-        # glMaterialfv(GL_FRONT,GL_DIFFUSE,color)
-        # glutSolidSphere(0.1, 30, 30)
-        # 
-        # glRotatef(angle[0], 1, 0, 0)
-        # glRotatef(angle[1], 0, 0, 1)
-        # glRotatef(-1 * angle[2], 0, 1, 0)
-        # 
-        # color = [0.0, 1.0, 0.0, 1.0]
-        # glMaterialfv(GL_FRONT,GL_DIFFUSE,color)
-        # glutSolidSphere(0.1, 30, 30)
-        
-
         glTranslate(*pointerPosition)
-
 
         color = [1.0, 0.0, 0.0, 1.0]
         glMaterialfv(GL_FRONT,GL_DIFFUSE,color)
         glutSolidSphere(0.1, 30, 30)
 
         glPopMatrix()
-        
-    elif pointerPosition != None and postPointingAngle != None and not currentlyPointing:
-        print "POINTING METHOD 2"
-        glPushMatrix()
-        glLoadIdentity()
-        # Position the camera at [0,0,20], looking at [0,0,0],
-        # with [0,1,0] as the up direction.
-        gluLookAt(0,0,10,
-                  0,0,0,
-                  0,1,0)
-
-        # glTranslate(*reverseCenter)
-
-        # absolutePointerPosition = [center[i] + pointerPosition[i] for i in range(len(center))]
-
-
-        glTranslate(*center)        
-        
-        # color = [0.0, 0.0, 1.0, 1.0]
-        # glMaterialfv(GL_FRONT,GL_DIFFUSE,color)
-        # glutSolidSphere(0.1, 30, 30)
-        # 
-        # rotateAngle = [angle[i] - postPointingAngle[i] for i in range(len(angle))]
-        # glRotatef(rotateAngle[0], 1, 0, 0)
-        # glRotatef(rotateAngle[1], 0, 0, 1)
-        # glRotatef(-1 * rotateAngle[2], 0, 1, 0)
-        # glRotatef(-1 * postPointingAngle[0], 1, 0, 0)
-        # glRotatef(-1 * postPointingAngle[1], 0, 0, 1)
-        # glRotatef(postPointingAngle[2], 0, 1, 0)
-        # 
-        glRotatef(angle[0], 1, 0, 0)
-        glRotatef(angle[1], 0, 0, 1)
-        glRotatef(-1 * angle[2], 0, 1, 0)
-        # print postPointingAngle, angle, '\n\n'
-        
-
-
-        
-        # 
-        # color = [0.0, 1.0, 0.0, 1.0]
-        # glMaterialfv(GL_FRONT,GL_DIFFUSE,color)
-        # glutSolidSphere(0.1, 30, 30)
-        
-
-        glTranslate(*pointerPosition)
-
-
-        color = [1.0, 0.0, 0.0, 1.0]
-        glMaterialfv(GL_FRONT,GL_DIFFUSE,color)
-        glutSolidSphere(0.1, 30, 30)
-
-        glPopMatrix()
-    
     glutSwapBuffers()
     return
 
@@ -524,9 +359,9 @@ def initRendering():
     gluPerspective(60.,1.,1.,60.)
     glMatrixMode(GL_MODELVIEW)
     
-    # Position the camera at [0,0,20], looking at [0,0,0],
+    # Position the camera at [0,0,10], looking at [0,0,0],
     # with [0,1,0] as the up direction.
-    gluLookAt(0,0,20,
+    gluLookAt(0,0,10,
               0,0,0,
               0,1,0)
     glPushMatrix()

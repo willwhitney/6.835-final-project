@@ -15,9 +15,11 @@ radiusDecreaseThreshold = 5
 
 palmVelocityThreshold = 500
 
-queue = Queue.Queue()
+controlQueue = Queue.Queue()
+pointerQueue = Queue.Queue()
 
 center = [0, 0, 0]
+pointerPosition = [0, 0, 0]
 angle = [0, 0, 0]
 translation = [0, 0, 0]
 rotation = [0, 0, 0]
@@ -31,8 +33,11 @@ class GestureController(Leap.Listener):
         self.controlHand = None
         print "Initialized"
 
-    def setQueue(self, queue):
-        self.queue = queue
+    def setControlQueue(self, controlQueue):
+        self.controlQueue = controlQueue
+
+    def setPointerQueue(self, pointerQueue):
+        self.pointerQueue = pointerQueue
 
     def on_connect(self, controller):
         print "Connected"
@@ -44,6 +49,7 @@ class GestureController(Leap.Listener):
     def average_hands(self, controller, start, stop, id=None):
         hand = {
             'sphere_radius': 0,
+            'sphere_center': Leap.Vector(0, 0, 0),
             'numFingers': 0,
             'x': 0,
             'y': 0,
@@ -63,7 +69,9 @@ class GestureController(Leap.Listener):
                         thisHand = h
             else:
                 thisHand = frame.hands[0]
+
             hand['sphere_radius'] += thisHand.sphere_radius
+            hand['sphere_center'] += thisHand.palm_position
             hand['numFingers'] += len(thisHand.fingers)
             hand['x'] += thisHand.palm_position.x 
             hand['y'] += thisHand.palm_position.y
@@ -72,7 +80,9 @@ class GestureController(Leap.Listener):
             hand['roll'] += thisHand.palm_normal.roll * Leap.RAD_TO_DEG
             hand['yaw'] += thisHand.direction.yaw * Leap.RAD_TO_DEG
         hand = {
+            'id': thisHand.id,
             'sphere_radius': hand['sphere_radius'] / (stop - start),
+            'sphere_center': hand['sphere_center'] / (stop - start),
             'numFingers': float(hand['numFingers']) / (stop - start),
             'x': hand['x'] / (stop - start),
             'y': hand['y'] / (stop - start),
@@ -82,6 +92,21 @@ class GestureController(Leap.Listener):
             'yaw': hand['yaw'] / (stop - start)
         }
         return hand
+
+    def get_fingers(self, controller, historyDepth=0, handId=None):
+        fingers = []
+        frame = controller.frame(historyDepth)
+        if len(frame.hands) == 0:
+            return None
+
+        if handId != None:
+            for h in frame.hands:
+                if h.id == handId:
+                    thisHand = h
+
+        if len(thisHand.fingers) < 0:
+            return None
+        return thisHand.fingers
 
     def one_recent_hand(self, controller, count):
         for i in xrange(0, count, 1):
@@ -106,6 +131,29 @@ class GestureController(Leap.Listener):
         else:
             self.controlHand = None
         self.state = state
+
+    def calculate_intersection(self, sphereCenter, sphereRadius, vectorStart, vectorDirection):
+        determinant = (vectorDirection.dot(vectorStart - sphereCenter)) ** 2 - \
+                ((vectorStart - sphereCenter).dot((vectorStart - sphereCenter)) \
+                - sphereRadius**2)
+
+        if determinant < 0:
+            return None
+
+        distances = []
+        distances.append(-1 * (vectorDirection.dot(vectorStart - sphereCenter)) + determinant ** (0.5))
+        distances.append(-1 * (vectorDirection.dot(vectorStart - sphereCenter)) - determinant ** (0.5))
+
+        # distances = filter(lambda x: x >=0, distances)
+        if len(distances) <= 0:
+            return None
+        distance = min(distances, key=lambda x: abs(x))
+
+        intersection = vectorStart + vectorDirection * distance
+
+        direction = (intersection - sphereCenter) / ((intersection - sphereCenter).dot(intersection - sphereCenter)) ** (0.5)
+        print direction
+        return direction
 
     def on_frame(self, controller):
         frame = controller.frame()
@@ -140,6 +188,8 @@ class GestureController(Leap.Listener):
                             return
 
                 if self.state == self.activeState:
+                    controlHand = None
+                    pointerHand = None
                     for hand in controller.frame().hands:
                         if hand.id == self.controlHand:
                             controlHand = self.average_hands(controller, 0, averageWindow, hand.id)
@@ -147,7 +197,7 @@ class GestureController(Leap.Listener):
                         else:
                             pointerHand = self.average_hands(controller, 0, averageWindow, hand.id)
 
-                    if self.lastControlHand != None:
+                    if self.lastControlHand != None and controlHand != None:
                         translation = (
                                 controlHand['x'] - self.lastControlHand['x'], 
                                 controlHand['y'] - self.lastControlHand['y'], 
@@ -158,7 +208,25 @@ class GestureController(Leap.Listener):
                                 controlHand['roll'] - self.lastControlHand['roll'], 
                                 controlHand['yaw'] - self.lastControlHand['yaw']
                         )
-                        queue.put(translation + rotation)
+                        controlQueue.put(translation + rotation)
+
+                    if pointerHand != None and controlHand != None:
+                        # lastPointerFinger = self.get_fingers(controller, 1, pointerHand['id'])[0]
+
+                        pointerHandFingers = self.get_fingers(controller, 0, pointerHand['id'])
+                        if pointerHandFingers != None and len(pointerHandFingers) > 0:
+                            pointerFinger = pointerHandFingers[0]
+
+                            relativePointerPosition = self.calculate_intersection(controlHand['sphere_center'], \
+                                    150, pointerFinger.tip_position, pointerFinger.direction)
+                            if type(relativePointerPosition) != type(None):
+                                pointerQueue.put(relativePointerPosition.to_float_array())
+
+                            # lastPointerPosition = lastPointerFinger.tip_position.to_float_array()
+                            # pointerPosition = pointerFinger.tip_position.to_float_array()
+
+                        # translation = [pointerPosition[i] - lastPointerPosition[i] for i in range(len(pointerPosition))]
+                        # pointerQueue.put(translation)
                         
 
 
@@ -167,23 +235,27 @@ class GestureController(Leap.Listener):
                 self.set_state(self.inactiveState, controller)
 
 def updatePosition():
-    updated = not queue.empty()
+    updated = not controlQueue.empty() or not pointerQueue.empty()
     global center
     global angle
-    while not queue.empty():
-        movement = list(queue.get_nowait())
+    while not controlQueue.empty():
+        movement = list(controlQueue.get_nowait())
         translation = [movement[i] / 200 for i in range(3)]
         rotation = [movement[i] / 4 for i in range(3, 6)]
 
         center = [center[i] + translation[i] for i in range(3)]
         angle = [angle[i] + rotation[i] for i in range(3)]
 
-    # glLoadIdentity()
-    
-    # glRotatef(angle[0], 1, 0, 0)
-    # glRotatef(angle[1], 0, 1, 0)
-    # glRotatef(angle[2], 0, 0, 1)
-    # glTranslate(*center)
+    global pointerPosition
+    # global angle
+    while not pointerQueue.empty():
+        pointerPosition = list(pointerQueue.get_nowait())
+        # translation = [movement[i] / 200 for i in range(3)]
+        # rotation = [movement[i] / 4 for i in range(3, 6)]
+
+        # pointerPosition = [pointerPosition[i] + translation[i] for i in range(3)]
+        # angle = [angle[i] + rotation[i] for i in range(3)]
+
     if updated:
         glutPostRedisplay()
 
@@ -212,6 +284,8 @@ def keyboardFunc( key, x, y ):
 
 def drawScene():
     glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT)
+
+    # --------------------------- OBJECT ---------------------------
     glPushMatrix()
 
     # reverseCenter = [-1 * center[i] for i in range(3)]
@@ -232,6 +306,28 @@ def drawScene():
     color = [0.5, 0.5, 0.9, 1.0]
     glMaterialfv(GL_FRONT,GL_DIFFUSE,color)
     glutWireSphere(1, 30, 30)
+
+    # --------------------------- POINTER ---------------------------
+    glPopMatrix()
+
+    glPushMatrix()
+    glLoadIdentity()
+
+    glTranslate(0, 0, -10)
+    # glTranslate(*reverseCenter)
+
+    absolutePointerPosition = [center[i] + pointerPosition[i] for i in range(len(center))]
+
+    # print pointerPosition
+
+    glTranslate(*absolutePointerPosition)
+    # glRotatef(angle[0], 1, 0, 0)
+    # glRotatef(angle[1], 0, 0, 1)
+    # glRotatef(-1 * angle[2], 0, 1, 0)
+
+    color = [1.0, 0.0, 0.0, 1.0]
+    glMaterialfv(GL_FRONT,GL_DIFFUSE,color)
+    glutSolidSphere(0.1, 30, 30)
 
     glPopMatrix()
 
@@ -289,7 +385,8 @@ def main():
     listener = GestureController()
     controller = Leap.Controller()
 
-    listener.setQueue(queue)
+    listener.setControlQueue(controlQueue)
+    listener.setPointerQueue(pointerQueue)
 
     # Have the sample listener receive events from the controller
     controller.add_listener(listener)
